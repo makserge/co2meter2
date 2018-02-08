@@ -1,3 +1,4 @@
+http://arduino.ru/forum/proekty/korpus-ot-drs-8300-v-arduino-proektakh
 https://github.com/BlockThor/TM1628
 
 #include "TM1639.h"
