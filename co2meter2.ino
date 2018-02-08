@@ -210,7 +210,12 @@ void showData() {
   else {
     int co2 = getCo2Data();
     byte digit = co2 / 1000 % 10;
-    ledDisp.setDigit(0, 0, digit > 0 ? digit : 17, false);
+    if (digit > 0) {
+      ledDisp.setDigit(0, 0, digit, false);
+    }
+    else {
+      ledDisp.setChar(0, 0, ' ', false);
+    }
     ledDisp.setDigit(0, 1, co2 / 100 % 10, false);
     ledDisp.setDigit(0, 2, co2 / 10 % 10, false);
     ledDisp.setDigit(0, 3, co2 % 10, false);
@@ -221,7 +226,12 @@ void showTime() {
   byte hours = hour();
   byte minutes = minute();
 
-  ledDisp.setDigit(0, 4, hours / 10, false);
+  if (hours > 10) {
+    ledDisp.setDigit(0, 4, hours / 10, false);
+  }
+  else {
+    ledDisp.setChar(0, 4, ' ', false);
+  }
   ledDisp.setDigit(0, 5, hours % 10, tickShown);
   ledDisp.setDigit(0, 6, minutes / 10, false);
   ledDisp.setDigit(0, 7, minutes % 10, false);
