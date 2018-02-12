@@ -217,10 +217,6 @@ void getData() {
   isUpdateDisplay = true;
 }
 
-void changeClockTick() {
-  ledDisp.toggleTimeTick();
-}
-
 void updateDisplay() {
   if (!isUpdateDisplay) {
     return;
