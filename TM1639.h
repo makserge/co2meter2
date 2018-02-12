@@ -173,7 +173,7 @@ class TM1639 {
          * Params:
          * digit  the position of the digit on the display (0..7)
          */
-        void setDigitOff(byte digit);
+        void switchOffDigit(byte digit);
 
         /* 
          * Switch on/off semicolon on a 7-Segment Display

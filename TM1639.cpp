@@ -66,7 +66,7 @@ void TM1639::setDigit(byte digit, byte value) {
   sendData(data);
 }
 
-void TM1639::setDigitOff(byte digit) {
+void TM1639::switchOffDigit(byte digit) {
   byte data[16];
   memcpy(data, DIGIT_SWITCH_OFF_DATA, 16);
   
@@ -116,7 +116,7 @@ void TM1639::display(byte addr, byte data) {
 void TM1639::sendData(byte data[16]) {
   byte i;
   for (i = 0; i < 16; i++) {
-    ledData[i] = ledData[i] | data[i];
+    ledData[i] = data[i] | ledData[i];
     
     display(i, ledData[i]);
   }

@@ -50,8 +50,7 @@ const int NTP_SERVER_PORT = 123;
 const int NTP_SERVER_RETRY_DELAY = 16000;
 
 const double NTP_SERVER_UPDATE_INTERVAL = 86400;
-const double SENSOR_UPDATE_INTERVAL = 30;
-const float TIME_TICK_UPDATE_INTERVAL = 0.5;
+const double DATA_UPDATE_INTERVAL = 60;
 const byte MAX_WIFI_CONNECT_DELAY = 50;
 
 const byte LED_BRIGHTNESS = 7;
@@ -64,8 +63,6 @@ IPAddress ntpServerIP;
 
 WiFiClient httpClient;
 
-Ticker blinker;
-
 SoftwareSerial co2SensorSerial(S8_RX_PIN, S8_TX_PIN);
 
 TM1639 ledDisp(LED_DIN_PIN, LED_CLK_PIN, LED_STB_PIN);
@@ -73,12 +70,9 @@ TM1639 ledDisp(LED_DIN_PIN, LED_CLK_PIN, LED_STB_PIN);
 boolean displayMode;
 boolean DISPLAY_MODE_TEMP = true;
 
-boolean tickShown;
+boolean isUpdateDisplay;
 
-void changeClockTick() {
-  tickShown = !tickShown;
-  ledDisp.showTimeTick(tickShown);
-}
+byte ledData[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 
 time_t getNTPtime() {
   time_t epoch = 0UL;
@@ -193,45 +187,91 @@ float getHumidityData() {
   return intHumidity;
 }
 
-void showData() {
-  ledDisp.clearDisplay();
+void getData() {
   if (displayMode == DISPLAY_MODE_TEMP) {
     int temp = getTemperatureData();
     int humidity = getHumidityData();
-
-    ledDisp.setDigit(2, temp / 10 % 10);
-    ledDisp.setDigit(1, temp % 10);
-    ledDisp.showDegreeSign();
+     
+    ledData[2] = temp / 10 % 10;
+    ledData[1] = temp % 10;
     
-    ledDisp.setDigit(5, humidity / 10 % 10);
-    ledDisp.setDigit(6, humidity % 10);
-    ledDisp.showHumiditySign();
+    ledData[6] = humidity / 10 % 10;
+    ledData[5] = humidity % 10;
   }
   else {
     int co2 = getCo2Data();
-    byte digit = co2 / 1000 % 10;
-    if (digit > 0) {
-      ledDisp.setDigit(3, digit);
-    }
-    else {
-      ledDisp.setDigitOff(3);
-    }
-    ledDisp.setDigit(2, co2 / 100 % 10);
-    ledDisp.setDigit(1, co2 / 10 % 10);
-    ledDisp.setDigit(0, co2 % 10);
+    
+    ledData[3] = co2 / 1000 % 10;
+    ledData[2] = co2 / 100 % 10;
+    ledData[1] = co2 / 10 % 10;
+    ledData[0] = co2 % 10;
 
     byte hours = hour();
     byte minutes = minute();
 
-    if (hours > 10) {
-      ledDisp.setDigit(7, hours / 10);
+    ledData[7] = hours / 10;
+    ledData[6] = hours % 10;
+    ledData[5] = minutes / 10;
+    ledData[4] = minutes % 10; 
+  }
+  isUpdateDisplay = true;
+}
+
+void changeClockTick() {
+  ledDisp.toggleTimeTick();
+}
+
+void updateDisplay() {
+  if (!isUpdateDisplay) {
+    return;
+  }
+  isUpdateDisplay = false;
+    
+  ledDisp.clearDisplay();
+
+  if (displayMode == DISPLAY_MODE_TEMP) {
+    byte digit = ledData[2];
+    if (digit > 0) {  
+      ledDisp.setDigit(2, digit);
     }
     else {
-      ledDisp.setDigitOff(7);
+      ledDisp.switchOffDigit(2);
     }
-    ledDisp.setDigit(6, hours % 10);
-    ledDisp.setDigit(5, minutes / 10);
-    ledDisp.setDigit(4, minutes % 10); 
+    ledDisp.setDigit(1, ledData[1]);
+    ledDisp.showDegreeSign();
+    
+    ledDisp.setDigit(6, ledData[6]);
+    ledDisp.setDigit(5, ledData[5]);
+    ledDisp.showHumiditySign();
+
+    ledDisp.showTimeTick(false);
+  }
+  else {
+    byte digit = ledData[3];
+    if (digit > 0) {
+      ledDisp.setDigit(3, digit);
+    }
+    else {
+      ledDisp.switchOffDigit(3);
+    }
+    ledDisp.setDigit(2, ledData[2]);
+    ledDisp.setDigit(1, ledData[1]);
+    ledDisp.setDigit(0, ledData[0]);
+
+    byte hours = ledData[7];
+    byte minutes = minute();
+
+    if (hours > 10) {
+      ledDisp.setDigit(7, hours);
+    }
+    else {
+      ledDisp.switchOffDigit(7);
+    }
+    ledDisp.setDigit(6, ledData[6]);
+    ledDisp.setDigit(5, ledData[5]);
+    ledDisp.setDigit(4, ledData[4]);
+
+    ledDisp.showTimeTick(true);
   }
 }
 
@@ -259,16 +299,7 @@ void checkModeButton() {
 
   if (debouncer.fell()) {
     displayMode = !displayMode;
-    if (displayMode == DISPLAY_MODE_TEMP) {
-      blinker.detach();
-
-      tickShown = true;
-      changeClockTick();
-    }
-    else {
-      blinker.attach(TIME_TICK_UPDATE_INTERVAL, changeClockTick);
-    }
-    showData();
+    getData();
   }
 }
 
@@ -285,13 +316,13 @@ void setup() {
   setSyncProvider(getNTPtime);
   setSyncInterval(NTP_SERVER_UPDATE_INTERVAL);
 
-  showData();
-
-  Alarm.timerRepeat(SENSOR_UPDATE_INTERVAL, showData);
-  //blinker.attach(TIME_TICK_UPDATE_INTERVAL, changeClockTick); 
+  getData();
+ 
+  Alarm.timerRepeat(DATA_UPDATE_INTERVAL, getData);
 }
 
 void loop() {
   checkModeButton();
+  updateDisplay();
   Alarm.delay(100);
 }
