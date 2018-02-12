@@ -1,4 +1,3 @@
-#include "LedControl.h"
 #include <Ticker.h>
 #include "TimeLib.h"
 #include "TimeAlarms.h"
@@ -12,6 +11,7 @@
 #include <DNSServer.h>
 #include <ESP8266WebServer.h>
 #include "WiFiManager.h"
+#include "TM1639.h"
 
 /*
  NodeMCU -> TM1639
@@ -23,9 +23,9 @@
 
 const byte MODE_BUTTON_PIN = 0;
 
-const byte MAX_DIN_PIN = 2;
-const byte MAX_CS_PIN = 16;
-const byte MAX_CLOCK_PIN = 4;
+const byte LED_DIN_PIN = 2;
+const byte LED_CLK_PIN = 4;
+const byte LED_STB_PIN = 16;
 
 const byte S8_RX_PIN = 13;
 const byte S8_TX_PIN = 15;
@@ -65,9 +65,9 @@ WiFiClient httpClient;
 
 Ticker blinker;
 
-LedControl ledDisp = LedControl(MAX_DIN_PIN, MAX_CLOCK_PIN, MAX_CS_PIN, 2);
-
 SoftwareSerial co2SensorSerial(S8_RX_PIN, S8_TX_PIN);
+
+TM1639 ledDisp(LED_DIN_PIN, LED_CLK_PIN, LED_STB_PIN);
 
 boolean displayMode;
 boolean DISPLAY_MODE_TEMP = true;
@@ -76,7 +76,7 @@ boolean tickShown;
 
 void changeClockTick() {
   tickShown = !tickShown;
-  showTime();
+  ledDisp.showTimeTick(tickShown);
 }
 
 time_t getNTPtime() {
@@ -140,7 +140,7 @@ double getCo2Data() {
   }
   
   byte timeout = 0;
-  while (co2SensorSerial.available() < 7 ) {
+  while (co2SensorSerial.available() < 7) {
     timeout++;  
     if (timeout > 10) {
         while(co2SensorSerial.available())
@@ -197,28 +197,26 @@ void showData() {
     int temp = getTemperatureData();
     int humidity = getHumidityData();
 
-    ledDisp.setDigit(0, 0, temp / 10 % 10, false);
-    ledDisp.setDigit(0, 1, temp % 10, false);
-    ledDisp.setChar(0, 2, ' ', true);
-    ledDisp.setChar(0, 3, 'c', false);
+    ledDisp.setDigit(0, temp / 10 % 10);
+    ledDisp.setDigit(1, temp % 10);
+    ledDisp.showDegreeSign();
     
-    ledDisp.setDigit(0, 4, humidity / 10 % 10, false);
-    ledDisp.setDigit(0, 5, humidity % 10, false);
-    ledDisp.setRow(0, 6, 0x5);
-    ledDisp.setChar(0, 7, 'h', false);
+    ledDisp.setDigit(4, humidity / 10 % 10);
+    ledDisp.setDigit(5, humidity % 10);
+    ledDisp.showHumiditySign();
   }
   else {
     int co2 = getCo2Data();
     byte digit = co2 / 1000 % 10;
     if (digit > 0) {
-      ledDisp.setDigit(0, 0, digit, false);
+      ledDisp.setDigit(0, digit);
     }
     else {
-      ledDisp.setChar(0, 0, ' ', false);
+      ledDisp.setDigitOff(0);
     }
-    ledDisp.setDigit(0, 1, co2 / 100 % 10, false);
-    ledDisp.setDigit(0, 2, co2 / 10 % 10, false);
-    ledDisp.setDigit(0, 3, co2 % 10, false);
+    ledDisp.setDigit(1, co2 / 100 % 10);
+    ledDisp.setDigit(2, co2 / 10 % 10);
+    ledDisp.setDigit(3, co2 % 10);
   }
 }
 
@@ -227,14 +225,14 @@ void showTime() {
   byte minutes = minute();
 
   if (hours > 10) {
-    ledDisp.setDigit(0, 4, hours / 10, false);
+    ledDisp.setDigit(4, hours / 10);
   }
   else {
-    ledDisp.setChar(0, 4, ' ', false);
+    ledDisp.setDigitOff(4);
   }
-  ledDisp.setDigit(0, 5, hours % 10, tickShown);
-  ledDisp.setDigit(0, 6, minutes / 10, false);
-  ledDisp.setDigit(0, 7, minutes % 10, false);
+  ledDisp.setDigit(5, hours % 10);
+  ledDisp.setDigit(6, minutes / 10);
+  ledDisp.setDigit(7, minutes % 10);
 }
 
 void restart() {
@@ -249,9 +247,7 @@ void modeButtonInit() {
 }
 
 void ledDisplayInit() {
-  ledDisp.shutdown(0, false);
-  ledDisp.setIntensity(0, LED_BRIGHTNESS);
-  ledDisp.clearDisplay(0);
+  ledDisp.setIntensity(LED_BRIGHTNESS);
 }
 
 void co2SensorInit() {
