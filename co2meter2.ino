@@ -16,16 +16,17 @@
 /*
  NodeMCU -> TM1639
  5V   -> 5V
- D8   -> CS
- D5   -> DIN
- D7   -> CLK
+ GND  -> GND
+ D4   -> DIN - white
+ D5   -> CLK - green
+ D6   -> STB - red
 */
 
 const byte MODE_BUTTON_PIN = 0;
 
 const byte LED_DIN_PIN = 2;
-const byte LED_CLK_PIN = 4;
-const byte LED_STB_PIN = 16;
+const byte LED_CLK_PIN = 14;
+const byte LED_STB_PIN = 12;
 
 const byte S8_RX_PIN = 13;
 const byte S8_TX_PIN = 15;
@@ -193,46 +194,45 @@ float getHumidityData() {
 }
 
 void showData() {
+  ledDisp.clearDisplay();
   if (displayMode == DISPLAY_MODE_TEMP) {
     int temp = getTemperatureData();
     int humidity = getHumidityData();
 
-    ledDisp.setDigit(0, temp / 10 % 10);
+    ledDisp.setDigit(2, temp / 10 % 10);
     ledDisp.setDigit(1, temp % 10);
     ledDisp.showDegreeSign();
     
-    ledDisp.setDigit(4, humidity / 10 % 10);
-    ledDisp.setDigit(5, humidity % 10);
+    ledDisp.setDigit(5, humidity / 10 % 10);
+    ledDisp.setDigit(6, humidity % 10);
     ledDisp.showHumiditySign();
   }
   else {
     int co2 = getCo2Data();
     byte digit = co2 / 1000 % 10;
     if (digit > 0) {
-      ledDisp.setDigit(0, digit);
+      ledDisp.setDigit(3, digit);
     }
     else {
-      ledDisp.setDigitOff(0);
+      ledDisp.setDigitOff(3);
     }
-    ledDisp.setDigit(1, co2 / 100 % 10);
-    ledDisp.setDigit(2, co2 / 10 % 10);
-    ledDisp.setDigit(3, co2 % 10);
-  }
-}
+    ledDisp.setDigit(2, co2 / 100 % 10);
+    ledDisp.setDigit(1, co2 / 10 % 10);
+    ledDisp.setDigit(0, co2 % 10);
 
-void showTime() {
-  byte hours = hour();
-  byte minutes = minute();
+    byte hours = hour();
+    byte minutes = minute();
 
-  if (hours > 10) {
-    ledDisp.setDigit(4, hours / 10);
+    if (hours > 10) {
+      ledDisp.setDigit(7, hours / 10);
+    }
+    else {
+      ledDisp.setDigitOff(7);
+    }
+    ledDisp.setDigit(6, hours % 10);
+    ledDisp.setDigit(5, minutes / 10);
+    ledDisp.setDigit(4, minutes % 10); 
   }
-  else {
-    ledDisp.setDigitOff(4);
-  }
-  ledDisp.setDigit(5, hours % 10);
-  ledDisp.setDigit(6, minutes / 10);
-  ledDisp.setDigit(7, minutes % 10);
 }
 
 void restart() {
@@ -264,14 +264,11 @@ void checkModeButton() {
 
       tickShown = true;
       changeClockTick();
-
-      showData();
     }
     else {
-      showTime();
-      showData();
       blinker.attach(TIME_TICK_UPDATE_INTERVAL, changeClockTick);
     }
+    showData();
   }
 }
 
@@ -288,11 +285,10 @@ void setup() {
   setSyncProvider(getNTPtime);
   setSyncInterval(NTP_SERVER_UPDATE_INTERVAL);
 
-  showTime();
   showData();
 
   Alarm.timerRepeat(SENSOR_UPDATE_INTERVAL, showData);
-  blinker.attach(TIME_TICK_UPDATE_INTERVAL, changeClockTick); 
+  //blinker.attach(TIME_TICK_UPDATE_INTERVAL, changeClockTick); 
 }
 
 void loop() {
