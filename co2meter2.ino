@@ -50,7 +50,8 @@ const int NTP_SERVER_PORT = 123;
 const int NTP_SERVER_RETRY_DELAY = 16000;
 
 const double NTP_SERVER_UPDATE_INTERVAL = 86400;
-const double DATA_UPDATE_INTERVAL = 60;
+const double DATA_UPDATE_INTERVAL = 15;
+const double TICKER_UPDATE_INTERVAL = 0.5;
 const byte MAX_WIFI_CONNECT_DELAY = 50;
 
 const byte LED_BRIGHTNESS = 7;
@@ -72,20 +73,28 @@ boolean DISPLAY_MODE_TEMP = true;
 
 boolean isUpdateDisplay;
 
-byte ledData[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+int lastTemp;
+int lastHumidity;
+int lastCo2;
+byte lastHours;
+byte lastMinutes;
+
+boolean isTimeTick;
+
+AlarmID_t tickerTimer;
 
 time_t getNTPtime() {
   time_t epoch = 0UL;
-  while((epoch = getFromNTP()) == 0) {
+  while ((epoch = getDataFromNTP()) == 0) {
     delay(NTP_SERVER_RETRY_DELAY);
   }
   epoch -= 2208988800UL;
   return CE.toLocal(epoch, &tcr);
 }
 
-unsigned long getFromNTP() {
+unsigned long getDataFromNTP() {
   udp.begin(NTP_CLIENT_PORT);
-  if(!WiFi.hostByName(NTP_SERVER, ntpServerIP)) {
+  if (!WiFi.hostByName(NTP_SERVER, ntpServerIP)) {
     Serial.println("DNS lookup failed.");
     return 0UL;
   }
@@ -94,7 +103,7 @@ unsigned long getFromNTP() {
   Serial.print(" ");
   Serial.println(ntpServerIP);
   memset(ntpPacketBuffer, 0, NTP_PACKET_SIZE);
-  ntpPacketBuffer[0] = 0b11100011;
+  ntpPacketBuffer[0] = 0xE3;
   ntpPacketBuffer[1] = 0;
   ntpPacketBuffer[2] = 6;
   ntpPacketBuffer[3] = 0xEC;
@@ -107,7 +116,6 @@ unsigned long getFromNTP() {
   udp.write(ntpPacketBuffer, NTP_PACKET_SIZE);
   udp.endPacket();
   
-   // wait to see if a reply is available
   delay(2000);
   int cb = udp.parsePacket();
   if (!cb) {
@@ -126,8 +134,8 @@ unsigned long getFromNTP() {
 }
 
 double getCo2Data() {
-  byte command[] = {0xFE, 0X44, 0X00, 0X08, 0X02, 0X9F, 0X25};
-  byte response[] = {0,0,0,0,0,0,0};
+  byte command[] = { 0xFE, 0X44, 0X0, 0X08, 0X02, 0X9F, 0X25 };
+  byte response[] = { 0, 0, 0, 0, 0, 0, 0 };
   
   while (!co2SensorSerial.available()) {
     co2SensorSerial.write(command, 7);
@@ -191,29 +199,88 @@ void getData() {
   if (displayMode == DISPLAY_MODE_TEMP) {
     int temp = getTemperatureData();
     int humidity = getHumidityData();
-     
-    ledData[2] = temp / 10 % 10;
-    ledData[1] = temp % 10;
+
+    if (temp != lastTemp) {
+      lastTemp = temp;
+      
+      byte digit = temp / 10 % 10;
+      if (digit > 0) {  
+        ledDisp.setDigit(2, digit);
+      }
+      else {
+        ledDisp.switchOffDigit(2);
+      }
+      
+      ledDisp.setDigit(1, temp % 10);
+      ledDisp.showDegreeSign();
+
+      isUpdateDisplay = true;
+    }  
+
+    if (humidity != lastHumidity) {
+      lastHumidity = humidity;
+
+      ledDisp.setDigit(6, humidity / 10 % 10);
+      ledDisp.setDigit(5, humidity % 10);
+      ledDisp.showHumiditySign();
     
-    ledData[6] = humidity / 10 % 10;
-    ledData[5] = humidity % 10;
+      isUpdateDisplay = true;
+    }
   }
   else {
     int co2 = getCo2Data();
-    
-    ledData[3] = co2 / 1000 % 10;
-    ledData[2] = co2 / 100 % 10;
-    ledData[1] = co2 / 10 % 10;
-    ledData[0] = co2 % 10;
 
+    if (co2 != lastCo2) {
+      lastCo2 = co2;
+    
+      byte digit = co2 / 1000 % 10;
+      if (digit > 0) {
+        ledDisp.setDigit(3, digit);
+      }
+      else {
+        ledDisp.switchOffDigit(3);
+      }
+
+      ledDisp.setDigit(2, co2 / 100 % 10);
+      ledDisp.setDigit(1,  co2 / 10 % 10);
+      ledDisp.setDigit(0, co2 % 10);
+
+      isUpdateDisplay = true;
+    }
+    
     byte hours = hour();
     byte minutes = minute();
 
-    ledData[7] = hours / 10;
-    ledData[6] = hours % 10;
-    ledData[5] = minutes / 10;
-    ledData[4] = minutes % 10; 
+    if (hours != lastHours) {
+      lastHours = hours;
+    
+      if (hours > 10) {
+        ledDisp.setDigit(7, hours / 10);
+      }
+      else {
+        ledDisp.switchOffDigit(7);
+      }
+      ledDisp.setDigit(6, hours % 10);
+    
+      isUpdateDisplay = true;
+    }
+
+    if (minutes != lastMinutes) {
+      lastMinutes = minutes;
+
+      ledDisp.setDigit(5, minutes / 10);
+      ledDisp.setDigit(4, minutes % 10);
+    
+      isUpdateDisplay = true;
+    } 
   }
+}
+
+void getTicker() {
+  isTimeTick = !isTimeTick;
+  
+  ledDisp.showTimeTick(isTimeTick);
+
   isUpdateDisplay = true;
 }
 
@@ -223,52 +290,7 @@ void updateDisplay() {
   }
   isUpdateDisplay = false;
     
-  ledDisp.clearDisplay();
-
-  if (displayMode == DISPLAY_MODE_TEMP) {
-    byte digit = ledData[2];
-    if (digit > 0) {  
-      ledDisp.setDigit(2, digit);
-    }
-    else {
-      ledDisp.switchOffDigit(2);
-    }
-    ledDisp.setDigit(1, ledData[1]);
-    ledDisp.showDegreeSign();
-    
-    ledDisp.setDigit(6, ledData[6]);
-    ledDisp.setDigit(5, ledData[5]);
-    ledDisp.showHumiditySign();
-
-    ledDisp.showTimeTick(false);
-  }
-  else {
-    byte digit = ledData[3];
-    if (digit > 0) {
-      ledDisp.setDigit(3, digit);
-    }
-    else {
-      ledDisp.switchOffDigit(3);
-    }
-    ledDisp.setDigit(2, ledData[2]);
-    ledDisp.setDigit(1, ledData[1]);
-    ledDisp.setDigit(0, ledData[0]);
-
-    byte hours = ledData[7];
-    byte minutes = minute();
-
-    if (hours > 10) {
-      ledDisp.setDigit(7, hours);
-    }
-    else {
-      ledDisp.switchOffDigit(7);
-    }
-    ledDisp.setDigit(6, ledData[6]);
-    ledDisp.setDigit(5, ledData[5]);
-    ledDisp.setDigit(4, ledData[4]);
-
-    ledDisp.showTimeTick(true);
-  }
+  ledDisp.updateDisplay();
 }
 
 void restart() {
@@ -278,6 +300,7 @@ void restart() {
 
 void modeButtonInit() {
   pinMode(MODE_BUTTON_PIN, INPUT);
+  
   debouncer.attach(MODE_BUTTON_PIN);
   debouncer.interval(100);
 }
@@ -296,6 +319,16 @@ void checkModeButton() {
   if (debouncer.fell()) {
     displayMode = !displayMode;
     getData();
+
+    if (displayMode == DISPLAY_MODE_TEMP) {
+      isTimeTick = true;
+      getTicker();
+      
+      Alarm.disable(tickerTimer);
+    }
+    else {
+      Alarm.enable(tickerTimer);
+    }
   }
 }
 
@@ -315,10 +348,12 @@ void setup() {
   getData();
  
   Alarm.timerRepeat(DATA_UPDATE_INTERVAL, getData);
+  tickerTimer = Alarm.timerRepeat(TICKER_UPDATE_INTERVAL, getTicker);
 }
 
 void loop() {
   checkModeButton();
   updateDisplay();
+  
   Alarm.delay(100);
 }

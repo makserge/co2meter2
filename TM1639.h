@@ -124,7 +124,9 @@ class TM1639 {
 
         void display(byte addr, byte data);
 
-        void sendData(byte data[16]);
+        void setData(byte data[16]);
+
+        void sendData(byte address, byte data);
 
         void writeByte(byte data);
 
@@ -191,4 +193,9 @@ class TM1639 {
          * Show humidity sign on a 7-Segment Display
          */
         void showHumiditySign();
+
+        /* 
+         * Refreshes data on a 7-Segment Display
+         */
+        void updateDisplay();
 };

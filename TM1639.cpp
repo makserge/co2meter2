@@ -29,9 +29,8 @@ void TM1639::clearDisplay() {
   byte i;
   for (i = 0; i < 16; i++) {
     ledData[i] = 0;
-    
-    display(i, ledData[i]);
   }
+  updateDisplay();
 }
 
 void TM1639::setDigit(byte digit, byte value) {
@@ -63,63 +62,64 @@ void TM1639::setDigit(byte digit, byte value) {
       memcpy(data, DIGIT7[value], 16);
       break;   
   }
-  sendData(data);
+  setData(data);
 }
 
 void TM1639::switchOffDigit(byte digit) {
   byte data[16];
   memcpy(data, DIGIT_SWITCH_OFF_DATA, 16);
   
-  sendData(data);
+  setData(data);
 }
 
 void TM1639::showTimeTick(boolean isShown) {
   byte data[16];
   memcpy(data, isShown ? TIME_SEMICOLON_DATA : DIGIT_SWITCH_OFF_DATA, 16);
   
-  sendData(data);
+  setData(data);
 }
 
 void TM1639::showDegreeSign() {
   byte data[16];
   memcpy(data, DEGREE_DATA, 16);
   
-  sendData(data);
+  setData(data);
 }
 
 void TM1639::showHumiditySign() {
   byte data[16];
   memcpy(data, HUMIDITY_DATA, 16);
   
-  sendData(data);
+  setData(data);
+}
+
+void TM1639::setData(byte data[16]) {
+  byte i;
+  for (i = 0; i < 16; i++) {
+    ledData[i] = data[i] | ledData[i];
+  }
+}
+
+void TM1639::updateDisplay() {
+  byte i;
+  for (i = 0; i < 16; i++) {
+    sendData(i, ledData[i]);
+  }
 }
 
 void TM1639::sendCommand(byte data) {
   digitalWrite(STB_PIN, LOW);
-  
   writeByte(data);
-  
   digitalWrite(STB_PIN, HIGH);
 }
 
-void TM1639::display(byte addr, byte data) {
+void TM1639::sendData(byte address, byte data) {
   sendCommand(DIRECT_ADDRESS_MODE);
   
   digitalWrite(STB_PIN, LOW);
-  
-  writeByte(START_ADDRESS | addr);
+  writeByte(START_ADDRESS | address);
   writeByte(data);
-  
   digitalWrite(STB_PIN, HIGH);
-}
-
-void TM1639::sendData(byte data[16]) {
-  byte i;
-  for (i = 0; i < 16; i++) {
-    ledData[i] = data[i] | ledData[i];
-    
-    display(i, ledData[i]);
-  }
 }
 
 void TM1639::writeByte(byte data) {
@@ -132,6 +132,3 @@ void TM1639::writeByte(byte data) {
     digitalWrite(CLK_PIN, HIGH);
   }
 }
- 
-
-
