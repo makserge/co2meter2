@@ -125,8 +125,6 @@ class TM1639 {
 
         void setData(byte data[16]);
 
-        void sendData(byte address, byte data);
-
         void writeByte(byte data);
 
         /* Data is shifted out of this pin*/

@@ -119,15 +119,6 @@ void TM1639::sendCommand(byte data) {
   digitalWrite(STB_PIN, HIGH);
 }
 
-void TM1639::sendData(byte address, byte data) {
-  sendCommand(DIRECT_ADDRESS_MODE);
-  
-  digitalWrite(STB_PIN, LOW);
-  writeByte(START_ADDRESS | address);
-  writeByte(data);
-  digitalWrite(STB_PIN, HIGH);
-}
-
 void TM1639::writeByte(byte data) {
   byte i;
 
