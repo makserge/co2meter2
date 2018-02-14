@@ -102,9 +102,15 @@ void TM1639::setData(byte data[16]) {
 
 void TM1639::updateDisplay() {
   byte i;
+
+  sendCommand(AUTOMATIC_ADDRESS_MODE);
+
+  digitalWrite(STB_PIN, LOW);
+  writeByte(START_ADDRESS);
   for (i = 0; i < 16; i++) {
-    sendData(i, ledData[i]);
+    writeByte(ledData[i]);  
   }
+  digitalWrite(STB_PIN, HIGH);
 }
 
 void TM1639::sendCommand(byte data) {
