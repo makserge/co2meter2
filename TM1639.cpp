@@ -96,15 +96,28 @@ void TM1639::showHumiditySign() {
 void TM1639::setData(byte data[16]) {
   byte i;
   for (i = 0; i < 16; i++) {
-    ledData[i] = data[i] | ledData[i];
+     ledData[i] = data[i] | ledData[i];
   }
 }
 
 void TM1639::updateDisplay() {
   byte i;
+
+  sendCommand(AUTOMATIC_ADDRESS_MODE);
+
+  digitalWrite(STB_PIN, LOW);
+  writeByte(START_ADDRESS);
   for (i = 0; i < 16; i++) {
-    sendData(i, ledData[i]);
+    writeByte(0);  
   }
+  digitalWrite(STB_PIN, HIGH);
+  
+  digitalWrite(STB_PIN, LOW);
+  writeByte(START_ADDRESS);
+  for (i = 0; i < 16; i++) {
+    writeByte(ledData[i]);  
+  }
+  digitalWrite(STB_PIN, HIGH);
 }
 
 void TM1639::sendCommand(byte data) {

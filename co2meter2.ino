@@ -51,10 +51,22 @@ const int NTP_SERVER_RETRY_DELAY = 16000;
 
 const double NTP_SERVER_UPDATE_INTERVAL = 86400;
 const double DATA_UPDATE_INTERVAL = 15;
-const double TICKER_UPDATE_INTERVAL = 0.5;
+const double TIME_UPDATE_INTERVAL = 1;
 const byte MAX_WIFI_CONNECT_DELAY = 50;
 
 const byte LED_BRIGHTNESS = 7;
+
+boolean displayMode;
+boolean DISPLAY_MODE_TEMP = true;
+
+boolean isTimeTick;
+boolean isUpdateDisplay;
+
+int temp;
+int humidity;
+int co2;
+
+AlarmID_t timeTimer;
 
 Bounce debouncer; 
 
@@ -67,21 +79,6 @@ WiFiClient httpClient;
 SoftwareSerial co2SensorSerial(S8_RX_PIN, S8_TX_PIN);
 
 TM1639 ledDisp(LED_DIN_PIN, LED_CLK_PIN, LED_STB_PIN);
-
-boolean displayMode;
-boolean DISPLAY_MODE_TEMP = true;
-
-boolean isUpdateDisplay;
-
-int lastTemp;
-int lastHumidity;
-int lastCo2;
-byte lastHours;
-byte lastMinutes;
-
-boolean isTimeTick;
-
-AlarmID_t tickerTimer;
 
 time_t getNTPtime() {
   time_t epoch = 0UL;
@@ -197,90 +194,17 @@ float getHumidityData() {
 
 void getData() {
   if (displayMode == DISPLAY_MODE_TEMP) {
-    int temp = getTemperatureData();
-    int humidity = getHumidityData();
-
-    if (temp != lastTemp) {
-      lastTemp = temp;
-      
-      byte digit = temp / 10 % 10;
-      if (digit > 0) {  
-        ledDisp.setDigit(2, digit);
-      }
-      else {
-        ledDisp.switchOffDigit(2);
-      }
-      
-      ledDisp.setDigit(1, temp % 10);
-      ledDisp.showDegreeSign();
-
-      isUpdateDisplay = true;
-    }  
-
-    if (humidity != lastHumidity) {
-      lastHumidity = humidity;
-
-      ledDisp.setDigit(6, humidity / 10 % 10);
-      ledDisp.setDigit(5, humidity % 10);
-      ledDisp.showHumiditySign();
-    
-      isUpdateDisplay = true;
-    }
+    temp = getTemperatureData();
+    humidity = getHumidityData();
   }
   else {
-    int co2 = getCo2Data();
-
-    if (co2 != lastCo2) {
-      lastCo2 = co2;
-    
-      byte digit = co2 / 1000 % 10;
-      if (digit > 0) {
-        ledDisp.setDigit(3, digit);
-      }
-      else {
-        ledDisp.switchOffDigit(3);
-      }
-
-      ledDisp.setDigit(2, co2 / 100 % 10);
-      ledDisp.setDigit(1,  co2 / 10 % 10);
-      ledDisp.setDigit(0, co2 % 10);
-
-      isUpdateDisplay = true;
-    }
-    
-    byte hours = hour();
-    byte minutes = minute();
-
-    if (hours != lastHours) {
-      lastHours = hours;
-    
-      if (hours > 10) {
-        ledDisp.setDigit(7, hours / 10);
-      }
-      else {
-        ledDisp.switchOffDigit(7);
-      }
-      ledDisp.setDigit(6, hours % 10);
-    
-      isUpdateDisplay = true;
-    }
-
-    if (minutes != lastMinutes) {
-      lastMinutes = minutes;
-
-      ledDisp.setDigit(5, minutes / 10);
-      ledDisp.setDigit(4, minutes % 10);
-    
-      isUpdateDisplay = true;
-    } 
+    co2 = getCo2Data();
   }
+  isUpdateDisplay = true;
 }
 
-void getTicker() {
+void getTimeTick() {
   isTimeTick = !isTimeTick;
-  
-  ledDisp.showTimeTick(isTimeTick);
-
   isUpdateDisplay = true;
 }
 
@@ -289,7 +213,55 @@ void updateDisplay() {
     return;
   }
   isUpdateDisplay = false;
+  
+  ledDisp.clearDisplay();
     
+  if (displayMode == DISPLAY_MODE_TEMP) {
+    byte digit = temp / 10 % 10;
+    if (digit > 0) {  
+      ledDisp.setDigit(2, digit);
+    }
+    else {
+      ledDisp.switchOffDigit(2);
+    }
+      
+    ledDisp.setDigit(1, temp % 10);
+    ledDisp.showDegreeSign();
+  
+    ledDisp.setDigit(6, humidity / 10 % 10);
+    ledDisp.setDigit(5, humidity % 10);
+    ledDisp.showHumiditySign();
+  }
+  else {
+    byte digit = co2 / 1000 % 10;
+    if (digit > 0) {
+      ledDisp.setDigit(3, digit);
+    }
+    else {
+      ledDisp.switchOffDigit(3);
+    }
+
+    ledDisp.setDigit(2, co2 / 100 % 10);
+    ledDisp.setDigit(1,  co2 / 10 % 10);
+    ledDisp.setDigit(0, co2 % 10);
+    
+    byte hours = hour();
+    byte minutes = minute();
+
+    if (hours > 10) {
+      ledDisp.setDigit(7, hours / 10);
+    }
+    else {
+      ledDisp.switchOffDigit(7);
+    }
+    ledDisp.setDigit(6, hours % 10);
+    
+    ledDisp.setDigit(5, minutes / 10);
+    ledDisp.setDigit(4, minutes % 10);
+
+    ledDisp.showTimeTick(isTimeTick);
+  }
+
   ledDisp.updateDisplay();
 }
 
@@ -318,16 +290,14 @@ void checkModeButton() {
 
   if (debouncer.fell()) {
     displayMode = !displayMode;
+
     getData();
 
     if (displayMode == DISPLAY_MODE_TEMP) {
-      isTimeTick = true;
-      getTicker();
-      
-      Alarm.disable(tickerTimer);
+      Alarm.disable(timeTimer);
     }
     else {
-      Alarm.enable(tickerTimer);
+      Alarm.enable(timeTimer);
     }
   }
 }
@@ -348,7 +318,7 @@ void setup() {
   getData();
  
   Alarm.timerRepeat(DATA_UPDATE_INTERVAL, getData);
-  tickerTimer = Alarm.timerRepeat(TICKER_UPDATE_INTERVAL, getTicker);
+  timeTimer = Alarm.timerRepeat(TIME_UPDATE_INTERVAL, getTimeTick);
 }
 
 void loop() {
