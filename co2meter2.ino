@@ -1,4 +1,3 @@
-#include <Ticker.h>
 #include "TimeLib.h"
 #include "TimeAlarms.h"
 #include "Timezone.h"
@@ -17,19 +16,19 @@
  NodeMCU -> TM1639
  5V   -> 5V
  GND  -> GND
- D4   -> DIN - white
+ D0   -> DIN - white
  D5   -> CLK - green
  D6   -> STB - red
 */
 
 const byte MODE_BUTTON_PIN = 0;
 
-const byte LED_DIN_PIN = 2;
+const byte LED_DIN_PIN = 16;
 const byte LED_CLK_PIN = 14;
 const byte LED_STB_PIN = 12;
 
-const byte S8_RX_PIN = 13;
-const byte S8_TX_PIN = 15;
+const byte S8_RX_PIN = 2;
+const byte S8_TX_PIN = 13;
 
 const byte I2C_SDA = 5;
 const byte I2C_SCL = 4;
@@ -54,7 +53,11 @@ const double DATA_UPDATE_INTERVAL = 15;
 const double TIME_UPDATE_INTERVAL = 1;
 const byte MAX_WIFI_CONNECT_DELAY = 50;
 
-const byte LED_BRIGHTNESS = 7;
+const byte LOW_BRIGTNESS_HOUR = 21;
+const byte HIGH_BRIGTNESS_HOUR = 7;
+
+const byte LED_BRIGHTNESS_LOW = 1;
+const byte LED_BRIGHTNESS_HIGH = 7;
 
 boolean displayMode;
 boolean DISPLAY_MODE_TEMP = true;
@@ -215,7 +218,9 @@ void updateDisplay() {
   isUpdateDisplay = false;
   
   ledDisp.clearDisplay();
-    
+
+  byte hours = hour();
+      
   if (displayMode == DISPLAY_MODE_TEMP) {
     byte digit = temp / 10 % 10;
     if (digit > 0) {  
@@ -245,7 +250,6 @@ void updateDisplay() {
     ledDisp.setDigit(1,  co2 / 10 % 10);
     ledDisp.setDigit(0, co2 % 10);
     
-    byte hours = hour();
     byte minutes = minute();
 
     if (hours > 10) {
@@ -262,6 +266,7 @@ void updateDisplay() {
     ledDisp.showTimeTick(isTimeTick);
   }
 
+  ledDisp.setIntensity((hours > HIGH_BRIGTNESS_HOUR && hours < LOW_BRIGTNESS_HOUR) ? LED_BRIGHTNESS_HIGH : LED_BRIGHTNESS_LOW);
   ledDisp.updateDisplay();
 }
 
@@ -275,10 +280,6 @@ void modeButtonInit() {
   
   debouncer.attach(MODE_BUTTON_PIN);
   debouncer.interval(100);
-}
-
-void ledDisplayInit() {
-  ledDisp.setIntensity(LED_BRIGHTNESS);
 }
 
 void co2SensorInit() {
@@ -307,7 +308,6 @@ void setup() {
   Wire.begin(I2C_SDA, I2C_SCL);
 
   modeButtonInit();
-  ledDisplayInit();
   co2SensorInit();
   
   wifiManager.autoConnect("CO2Meter");
