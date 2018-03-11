@@ -252,7 +252,7 @@ void updateDisplay() {
     
     byte minutes = minute();
 
-    if (hours > 10) {
+    if (hours > 9) {
       ledDisp.setDigit(7, hours / 10);
     }
     else {
